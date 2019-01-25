@@ -40,7 +40,7 @@ export function getDestinationPath(file: string, fileSet: ResolvedFileSet) {
   }
 }
 
-function changeToNestedDestination(fileSet, appDir){
+function changeToNestedDestination(fileSet:ResolvedFileSet, appDir:string){
     // determine the hoist root
     // we assume it's always one step up from
     // the appDir
