@@ -27,6 +27,11 @@ export interface Metadata {
   readonly author?: AuthorMetadata | null
 
   /**
+   * Nest the app dir 
+   */
+  readonly nest?: boolean;
+
+  /**
    * The [repository](https://docs.npmjs.com/files/package.json#repository).
    */
   readonly repository?: string | RepositoryInfo | null

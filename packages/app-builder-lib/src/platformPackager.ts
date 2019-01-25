@@ -279,7 +279,7 @@ export abstract class PlatformPackager<DC extends PlatformSpecificBuildOptions> 
     } : config.extraMetadata, framework.createTransformer == null ? null : framework.createTransformer())
 
     const _computeFileSets = (matchers: Array<FileMatcher>) => {
-      return computeFileSets(matchers, this.info.isPrepackedAppAsar ? null : transformer, this, isElectronCompile)
+      return computeFileSets(matchers, this.info.isPrepackedAppAsar ? null : transformer, this, isElectronCompile, defaultDestination)
         .then(async result => {
           if (!this.info.isPrepackedAppAsar && !this.info.areNodeModulesHandledExternally) {
             const moduleFileMatcher = getNodeModuleFileMatcher(appDir, defaultDestination, macroExpander, platformSpecificBuildOptions, this.info)
@@ -457,8 +457,24 @@ export abstract class PlatformPackager<DC extends PlatformSpecificBuildOptions> 
 
     const resourcesDir = this.getResourcesDir(appOutDir)
     const mainFile = (framework.getMainFile == null ? null : framework.getMainFile(this.platform)) || this.info.metadata.main || "index.js"
-    await this.checkFileInPackage(resourcesDir, mainFile, "Application entry file", isAsar)
-    await this.checkFileInPackage(resourcesDir, "package.json", "Application", isAsar)
+
+
+    // If the build is nested we need to sanity check relative
+    // to the nested folder, instead of the /app folder. 
+    if(this.info.metadata.nest){
+        const nestedFolder = path.basename(this.info.appDir);
+        // @ts-ignore
+        await this.checkFileInPackage(resourcesDir, path.join(nestedFolder, this.info.metadata.main), "Application entry file", isAsar)
+        await this.checkFileInPackage(resourcesDir, path.join(nestedFolder, "package.json"), "Application", isAsar)
+    }else{
+        // @ts-ignore
+        // await this.checkFileInPackage(resourcesDir, this.info.metadata.main, "Application entry file", isAsar)
+        // await this.checkFileInPackage(resourcesDir, "package.json", "Application", isAsar)
+        await this.checkFileInPackage(resourcesDir, mainFile, "Application entry file", isAsar)
+        await this.checkFileInPackage(resourcesDir, "package.json", "Application", isAsar)
+    }
+
+
   }
 
   // tslint:disable-next-line:no-invalid-template-strings

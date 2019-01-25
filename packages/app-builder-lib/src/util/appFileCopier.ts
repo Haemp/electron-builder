@@ -1,7 +1,7 @@
 import BluebirdPromise from "bluebird-lst"
 import { AsyncTaskManager, log } from "builder-util"
 import { CONCURRENCY, FileCopier, Link, MAX_FILE_REQUESTS, FileTransformer, statOrNull, walk } from "builder-util/out/fs"
-import { ensureDir, readlink, Stats, symlink } from "fs-extra-p"
+import { ensureDir, readlink, Stats, symlink, outputFile, lstat } from "fs-extra-p"
 import * as path from "path"
 import { isLibOrExe } from "../asar/unpackDetector"
 import { Platform } from "../core"
@@ -40,8 +40,38 @@ export function getDestinationPath(file: string, fileSet: ResolvedFileSet) {
   }
 }
 
+function changeToNestedDestination(fileSet, appDir){
+    // determine the hoist root
+    // we assume it's always one step up from
+    // the appDir
+    const hoistRoot = path.resolve(appDir, '..');
+    
+    // We assume that the hoist root should be 
+    // relative to the resource directory
+    // /some/dir/hoisted-dir -> /Content/Resources/app
+    const relativeToHoist = fileSet.src.slice(hoistRoot.length);
+
+    // Find the resource root
+    const resourceRootPattern = 'Contents/Resources/app';
+    const resourceRoot = fileSet.destination.slice(
+        0,
+        fileSet.destination.lastIndexOf(resourceRootPattern) +
+        resourceRootPattern.length
+    );
+
+    fileSet.destination = path.join(resourceRoot, relativeToHoist);
+}
+
 export async function copyAppFiles(fileSet: ResolvedFileSet, packager: Packager, transformer: FileTransformer) {
   const metadata = fileSet.metadata
+
+  // @ts-ignore
+  // Check for nesting option
+  const info = packager.appInfo.info;
+  if (info.metadata.nest) {
+    changeToNestedDestination(fileSet, info.appDir);
+  }
+
   // search auto unpacked dir
   const taskManager = new AsyncTaskManager(packager.cancellationToken)
   const createdParentDirs = new Set<string>()
@@ -133,7 +163,7 @@ export async function transformFiles(transformer: FileTransformer, fileSet: Reso
   }, CONCURRENCY)
 }
 
-export async function computeFileSets(matchers: Array<FileMatcher>, transformer: FileTransformer | null, platformPackager: PlatformPackager<any>, isElectronCompile: boolean): Promise<Array<ResolvedFileSet>> {
+export async function computeFileSets(matchers: Array<FileMatcher>, transformer: FileTransformer | null, platformPackager: PlatformPackager<any>, isElectronCompile: boolean, defaultDestination:string): Promise<Array<ResolvedFileSet>> {
   const fileSets: Array<ResolvedFileSet> = []
   const packager = platformPackager.info
 
@@ -148,13 +178,71 @@ export async function computeFileSets(matchers: Array<FileMatcher>, transformer:
 
     const files = await walk(matcher.from, fileWalker.filter, fileWalker)
     const metadata = fileWalker.metadata
-    fileSets.push(validateFileSet({src: matcher.from, files, metadata, destination: matcher.to}))
+
+    const fileSet = validateFileSet({src: matcher.from, files, metadata, destination: matcher.to})
+
+
+    if (packager.metadata.nest) {
+        changeToNestedDestination(fileSet, packager.appDir)
+    }
+
+    fileSets.push(fileSet)
   }
 
   if (isElectronCompile) {
     // cache files should be first (better IO)
     fileSets.unshift(await compileUsingElectronCompile(fileSets[0], packager))
   }
+
+
+  
+  if(packager.metadata.nest){
+
+    // To make this work with asar=true
+    // we need to include this file as a 
+    // FileSet to be copied
+
+    // All we need is a way to connect the
+    // nested setup. And we do this with 
+    // a package.json file pointing to 
+    // /electron-app/index.js
+    const appName = path.basename(packager.appDir);
+    try{
+
+        // Write the file to a tmp folder inside the appDir
+        // we need it to be an actual file on the filesystem
+        // so that it can be part of a fileSet that the 
+        // asar packager can package.
+        const tmpPackagePath = path.join(packager.appDir, "$tmp", "package.json");
+        await outputFile(path.join(packager.appDir, "$tmp", "package.json"), JSON.stringify({
+            name: appName,
+            main: path.join(appName, packager.metadata.main as string)
+        }))
+
+        // Build the metadata required for the fileSet
+        const metadataMap = new Map();
+        const packageStats:Stats = await lstat(tmpPackagePath);
+        metadataMap.set(tmpPackagePath, packageStats);
+
+        // Create and validate the new fileSet
+        // and push it to the fileSets array.
+        // It will now be part of the asar package
+        // as well.
+        fileSets.push(validateFileSet({
+            // @ts-ignore
+            src: path.join(packager.appDir, "$tmp"),
+            files: [
+                path.join(packager.appDir, '$tmp', 'package.json')
+            ],
+            metadata: metadataMap,
+            destination: defaultDestination
+        }));
+
+    }catch(err){
+        console.error(err);
+    }
+  }
+
   return fileSets
 }
 
