@@ -48,8 +48,8 @@
   "dependencies": {
     "bluebird-lst": "^1.0.6",
     "chalk": "^2.4.1",
-    "builder-util-runtime": "0.0.0-semantic-release",
-    "builder-util": "0.0.0-semantic-release",
+    "builder-util-runtime": "file:../builder-util-runtime",
+    "builder-util": "file:../builder-util",
     "fs-extra-p": "^7.0.0",
     "is-ci": "^2.0.0",
     "read-config-file": "3.2.0",
@@ -57,8 +57,8 @@
     "update-notifier": "^2.5.0",
     "yargs": "^12.0.5",
     "lazy-val": "^1.0.3",
-    "app-builder-lib": "0.0.0-semantic-release",
-    "dmg-builder": "0.0.0-semantic-release"
+    "app-builder-lib": "file:../app-builder-lib",
+    "dmg-builder": "file:../dmg-builder"
   },
   "typings": "./out/index.d.ts",
   "publishConfig": {

@@ -19,7 +19,7 @@
     "bluebird-lst": "^1.0.6",
     "chalk": "^2.4.1",
     "debug": "^4.1.0",
-    "builder-util-runtime": "^0.0.0-semantic-release",
+    "builder-util-runtime": "file:../builder-util-runtime",
     "source-map-support": "^0.5.9",
     "7zip-bin": "~4.1.0",
     "js-yaml": "^3.12.0"

@@ -16,10 +16,10 @@
     "fs-extra-p": "^7.0.0",
     "bluebird-lst": "^1.0.6",
     "parse-color": "^1.0.0",
-    "builder-util": "~0.0.0-semantic-release",
+    "builder-util": "file:../builder-util",
     "iconv-lite": "^0.4.24",
     "js-yaml": "^3.12.0",
-    "app-builder-lib": "~0.0.0-semantic-release",
+    "app-builder-lib": "file:../app-builder-lib",
     "sanitize-filename": "^1.6.1"
   },
   "typings": "./out/dmg.d.ts"
