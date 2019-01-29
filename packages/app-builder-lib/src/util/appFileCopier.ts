@@ -41,6 +41,12 @@ export function getDestinationPath(file: string, fileSet: ResolvedFileSet) {
 }
 
 function changeToNestedDestination(fileSet:ResolvedFileSet, appDir:string){
+    
+    // The $tmp files are a special hack
+    // we don't want to rewrite them
+    if(fileSet.src === path.join(appDir, '$tmp')){
+        return 
+    }
     // determine the hoist root
     // we assume it's always one step up from
     // the appDir
@@ -214,10 +220,16 @@ export async function computeFileSets(matchers: Array<FileMatcher>, transformer:
         // so that it can be part of a fileSet that the 
         // asar packager can package.
         const tmpPackagePath = path.join(packager.appDir, "$tmp", "package.json");
-        await outputFile(path.join(packager.appDir, "$tmp", "package.json"), JSON.stringify({
-            name: appName,
-            main: path.join(appName, packager.metadata.main as string)
-        }))
+        try{
+            await outputFile(path.join(packager.appDir, "$tmp", "package.json"), JSON.stringify({
+                name: appName,
+                main: path.join(appName, packager.metadata.main as string)
+            }))
+        }catch(err){
+            console.error('Couldn\'t create the package.json', err);
+        }
+
+
 
         // Build the metadata required for the fileSet
         const metadataMap = new Map();
@@ -298,7 +310,13 @@ export async function computeNodeModuleFileSets(platformPackager: PlatformPackag
     const copier = new NodeModuleCopyHelper(matcher, platformPackager.info)
     const names = info.deps
     const files = await copier.collectNodeModules(source, names, nodeModuleExcludedExts)
-    return validateFileSet({src: source, destination, files, metadata: copier.metadata})
+    const fileSet = validateFileSet({src: source, destination, files, metadata: copier.metadata})
+
+    if(platformPackager.info.metadata.nest){
+        changeToNestedDestination(fileSet, platformPackager.info.appDir);
+    }
+
+    return fileSet;
   })
 }
 
